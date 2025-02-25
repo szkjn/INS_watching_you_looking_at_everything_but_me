@@ -1,31 +1,30 @@
-from src.video_capture import VideoCapture
 from src.face_detection import FaceDetector
-from src.emotion_detection import EmotionDetector
 from src.display import Display
-from src.config import SCREEN_WIDTH, SCREEN_HEIGHT
+import depthai as dai
 
 def main():
-    video_capture = VideoCapture()
-    face_detector = FaceDetector()
-    emotion_detector = EmotionDetector()
-    display = Display(SCREEN_WIDTH, SCREEN_HEIGHT)
+    detector = FaceDetector()
+    display = Display()
 
-    while video_capture.is_opened():
-        frame = video_capture.read_frame()
-        if frame is None:
-            break
+    with dai.Device(detector.pipeline) as device:
+        q_rgb = device.getOutputQueue("rgb")
+        q_nn = device.getOutputQueue("nn")
 
-        faces = face_detector.detect_faces(frame)
-        eyes_bounding_boxes, face_emotions = emotion_detector.detect_emotions(frame, faces)
+        while True:
+            frame = detector.get_frame(q_rgb)
+            detections = detector.get_detections(q_nn)
 
-        output_screen = display.create_output_screen(eyes_bounding_boxes, face_emotions, frame)
-        display.show_output_screen(output_screen)
+            if frame is not None:
+                eyes_bounding_boxes = detector.process_detections(frame, detections)
+                
+                # Sort eyes left to right to avoid duplication issues
+                eyes_bounding_boxes.sort(key=lambda eye: eye[0])
 
-        if display.check_exit_condition():
-            break
+                output_screen = display.create_output_screen(eyes_bounding_boxes, frame)
+                display.show_output_screen(output_screen)
 
-    video_capture.release()
-    display.destroy_all_windows()
-
+            if display.check_exit_condition():
+                break
+            
 if __name__ == "__main__":
     main()

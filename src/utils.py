@@ -1,4 +1,6 @@
-import cv2
+import numpy as np
 
-def load_cascade_model(model_path):
-    return cv2.CascadeClassifier(cv2.data.haarcascades + model_path)
+def frameNorm(frame, bbox):
+    normVals = np.full(len(bbox), frame.shape[0])
+    normVals[::2] = frame.shape[1]
+    return (np.clip(np.array(bbox), 0, 1) * normVals).astype(int)

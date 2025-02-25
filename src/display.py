@@ -2,17 +2,17 @@ import cv2
 import numpy as np
 
 class Display:
-    def __init__(self, width, height):
+    def __init__(self, width=1280, height=720):
         self.width = width
         self.height = height
 
-    def create_output_screen(self, eyes_bounding_boxes, face_emotions, frame):
+    def create_output_screen(self, eyes_bounding_boxes, frame):
         output_screen = np.zeros((self.height, self.width, 3), dtype=np.uint8)
 
         if len(eyes_bounding_boxes) == 0:
             self._display_no_eyes(output_screen)
         else:
-            self._display_eyes(eyes_bounding_boxes, face_emotions, frame, output_screen)
+            self._display_eyes(eyes_bounding_boxes, frame, output_screen)
 
         return output_screen
 
@@ -29,14 +29,16 @@ class Display:
 
         cv2.putText(output_screen, text, (text_x, text_y), font, font_scale, text_color, font_thickness)
 
-    def _display_eyes(self, eyes_bounding_boxes, face_emotions, frame, output_screen):
+    def _display_eyes(self, eyes_bounding_boxes, frame, output_screen):
         num_eyes = len(eyes_bounding_boxes)
         rows, cols = self._determine_grid_layout(num_eyes)
         split_width = self.width // cols
         split_height = self.height // rows
 
-        for i, (x1, y1, x2, y2, face_box) in enumerate(eyes_bounding_boxes):
+        for i, (x1, y1, x2, y2) in enumerate(eyes_bounding_boxes):
             eye_img = frame[y1:y2, x1:x2]
+            if eye_img.size == 0:
+                continue  # Skip if bounding box is out of frame bounds
             resized_eye = cv2.resize(eye_img, (split_width, split_height))
 
             row_idx = i // cols
@@ -45,9 +47,6 @@ class Display:
             start_y = row_idx * split_height
 
             output_screen[start_y:start_y + split_height, start_x:start_x + split_width] = resized_eye
-
-            emotion_label = face_emotions.get(face_box, "Neutral")
-            self._overlay_emotion_label(output_screen, emotion_label, start_x, start_y, split_width, split_height)
 
     def _determine_grid_layout(self, num_eyes):
         if num_eyes == 1:
@@ -58,17 +57,6 @@ class Display:
             rows = int(np.ceil(num_eyes / 2))
             cols = 2
             return rows, cols
-
-    def _overlay_emotion_label(self, output_screen, emotion_label, start_x, start_y, split_width, split_height):
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = 0.7
-        font_thickness = 2
-        text_color = (0, 255, 0)
-
-        text_x = start_x + 10
-        text_y = start_y + split_height - 10
-
-        cv2.putText(output_screen, emotion_label, (text_x, text_y), font, font_scale, text_color, font_thickness)
 
     def show_output_screen(self, output_screen):
         cv2.imshow('Eye Detection', output_screen)

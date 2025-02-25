@@ -1,11 +1,11 @@
 import cv2
 import numpy as np
-from src.config import DEBUG_MODE
+from src.config import DEBUG_MODE, RGB_RESOLUTION
 
 class Display:
-    def __init__(self, width=1280, height=720):
-        self.width = width
-        self.height = height
+    def __init__(self):  # Increased default size for better visibility
+        self.width, self.height = RGB_RESOLUTION
+        self.fullscreen = False  # Start in windowed mode
 
     def create_output_screen(self, eyes_bounding_boxes, frame):
         output_screen = np.zeros((self.height, self.width, 3), dtype=np.uint8)
@@ -17,9 +17,9 @@ class Display:
 
         if DEBUG_MODE:
             debug_screen = self.create_debug_screen(frame, eyes_bounding_boxes)
-            return self._combine_debug_view(output_screen, debug_screen)
+            self.show_debug_screen(debug_screen)  # Show the debug window separately
 
-        return output_screen
+        return output_screen  # Only return the eye split screen
 
     def create_debug_screen(self, frame, eyes_bounding_boxes):
         debug_frame = frame.copy()
@@ -31,11 +31,12 @@ class Display:
         debug_resized = cv2.resize(debug_frame, (self.width, self.height))
         return debug_resized
 
-    def _combine_debug_view(self, output_screen, debug_screen):
-        # Stack the debug feed and eye display side by side
-        combined_display = np.hstack((debug_screen, output_screen))
-        return combined_display
-    
+    def show_debug_screen(self, debug_screen):
+        """Show the original camera feed with bounding boxes in a separate window."""
+        cv2.namedWindow('Debug View - Full Frame', cv2.WINDOW_NORMAL)
+        self._apply_window_state('Debug View - Full Frame')
+        cv2.imshow('Debug View - Full Frame', debug_screen)
+
     def _display_no_eyes(self, output_screen):
         text = "I C U"
         font = cv2.FONT_HERSHEY_SIMPLEX
@@ -58,7 +59,7 @@ class Display:
         for i, (x1, y1, x2, y2) in enumerate(eyes_bounding_boxes):
             eye_img = frame[y1:y2, x1:x2]
             if eye_img.size == 0:
-                continue  # Skip if bounding box is out of frame bounds
+                continue  # Skip invalid bounding boxes
             resized_eye = cv2.resize(eye_img, (split_width, split_height))
 
             row_idx = i // cols
@@ -79,10 +80,24 @@ class Display:
             return rows, cols
 
     def show_output_screen(self, output_screen):
+        """Show the processed eye detection output in a separate window and resize it to fit more space on screen."""
+        cv2.namedWindow('Eye Detection', cv2.WINDOW_NORMAL)
+        self._apply_window_state('Eye Detection')
         cv2.imshow('Eye Detection', output_screen)
 
+    def _apply_window_state(self, window_name):
+        if self.fullscreen:
+            cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+        else:
+            self.width, self.height = RGB_RESOLUTION
+            cv2.resizeWindow(window_name, self.width, self.height)
+            cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_NORMAL)
+
     def check_exit_condition(self):
-        return cv2.waitKey(1) & 0xFF == ord('q')
+        key = cv2.waitKey(1) & 0xFF
+        if key == ord('v'):
+            self.fullscreen = not self.fullscreen  # Toggle fullscreen mode
+        return key == ord('q')
 
     def destroy_all_windows(self):
         cv2.destroyAllWindows()

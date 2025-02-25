@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+from src.config import DEBUG_MODE
 
 class Display:
     def __init__(self, width=1280, height=720):
@@ -9,13 +10,32 @@ class Display:
     def create_output_screen(self, eyes_bounding_boxes, frame):
         output_screen = np.zeros((self.height, self.width, 3), dtype=np.uint8)
 
-        if len(eyes_bounding_boxes) == 0:
+        if not eyes_bounding_boxes:
             self._display_no_eyes(output_screen)
         else:
             self._display_eyes(eyes_bounding_boxes, frame, output_screen)
 
+        if DEBUG_MODE:
+            debug_screen = self.create_debug_screen(frame, eyes_bounding_boxes)
+            return self._combine_debug_view(output_screen, debug_screen)
+
         return output_screen
 
+    def create_debug_screen(self, frame, eyes_bounding_boxes):
+        debug_frame = frame.copy()
+
+        # Draw bounding boxes on the original frame
+        for (x1, y1, x2, y2) in eyes_bounding_boxes:
+            cv2.rectangle(debug_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)  # Green box for eyes
+
+        debug_resized = cv2.resize(debug_frame, (self.width, self.height))
+        return debug_resized
+
+    def _combine_debug_view(self, output_screen, debug_screen):
+        # Stack the debug feed and eye display side by side
+        combined_display = np.hstack((debug_screen, output_screen))
+        return combined_display
+    
     def _display_no_eyes(self, output_screen):
         text = "I C U"
         font = cv2.FONT_HERSHEY_SIMPLEX

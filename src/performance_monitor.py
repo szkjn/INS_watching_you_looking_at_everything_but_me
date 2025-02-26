@@ -16,6 +16,6 @@ class PerformanceMonitor:
         return {
             "CPU Usage": f"{system_data.leonCssCpuUsage.average * 100:.2f}%",
             "Memory Used": f"{system_data.ddrMemoryUsage.used / (1024 * 1024):.2f} MiB",
-            "Chip Temperature": f"{system_data.chipTemperature.average:.2f}°C",
+            "Chip Temperature": f"{system_data.chipTemperature.average:.2f}*C",
         }
 

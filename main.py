@@ -1,12 +1,14 @@
 import depthai as dai
 from src.face_detection import FaceDetector
-from src.display import Display
+from src.display import Display, DebugDisplay
 from src.performance_monitor import PerformanceMonitor
+from src.config import DEBUG_MODE
 
 def main():
     pipeline = dai.Pipeline()
     detector = FaceDetector(pipeline)
     display = Display()
+    debug_display = DebugDisplay(fps=5) if DEBUG_MODE else None
     performance_monitor = PerformanceMonitor(pipeline)
 
     with dai.Device(pipeline) as device:
@@ -28,9 +30,16 @@ def main():
 
                 # Get performance data and overlay it
                 perf_data = performance_monitor.get_performance_data(system_queue)
-                display.overlay_performance_data(output_screen, perf_data)
                 
                 display.show_output_screen(output_screen)
+
+                if debug_display:
+                    debug_screen = debug_display.create_debug_screen(frame, eyes_bounding_boxes)
+                    debug_display.overlay_performance_data(debug_screen, perf_data)
+                    debug_display.show_debug_screen(debug_screen)
+
+                # Handle keyboard interactions (fullscreen toggle, color mode, save screenshot)
+                display.check_keyboard_interaction(output_screen)
 
             if display.check_exit_condition():
                 break

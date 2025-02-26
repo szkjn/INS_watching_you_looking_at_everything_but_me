@@ -1,6 +1,8 @@
 import blobconverter
 
-# Camera settings
+
+FPS = 15    # Default is 30; reduce to 15 FPS
+
 # RGB_RESOLUTION = (1920, 1080)
 RGB_RESOLUTION = (1280, 720)
 # RGB_RESOLUTION = (1440, 1080)

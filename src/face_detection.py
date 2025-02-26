@@ -2,12 +2,12 @@ import depthai as dai
 import cv2
 import numpy as np
 import time
-from src.config import RGB_RESOLUTION, FACE_DETECT_MODEL, CONFIDENCE_THRESHOLD
+from src.config import RGB_RESOLUTION, FACE_DETECT_MODEL, CONFIDENCE_THRESHOLD, FPS
 from src.utils import frameNorm
 
 class FaceDetector:
-    def __init__(self):
-        self.pipeline = dai.Pipeline()
+    def __init__(self, pipeline):
+        self.pipeline = pipeline
         self._setup_pipeline()
         self.eye_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_eye.xml')
         self.previous_eyes = []  # Store last detected eye positions
@@ -21,7 +21,7 @@ class FaceDetector:
         cam_rgb.setInterleaved(False)
 
         # Set FPS lower to stabilize detections
-        cam_rgb.setFps(15)  # Default is 30; reduce to 15 FPS
+        cam_rgb.setFps(FPS)
 
         manip = self.pipeline.createImageManip()
         manip.initialConfig.setResize(300, 300)

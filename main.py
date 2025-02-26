@@ -1,6 +1,6 @@
+import depthai as dai
 from src.face_detection import FaceDetector
 from src.display import Display
-import depthai as dai
 
 def main():
     detector = FaceDetector()

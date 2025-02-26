@@ -3,12 +3,16 @@ import numpy as np
 from src.config import DEBUG_MODE, RGB_RESOLUTION
 
 class Display:
-    def __init__(self):  # Increased default size for better visibility
+    def __init__(self): 
         self.width, self.height = RGB_RESOLUTION
-        self.fullscreen = False  # Start in windowed mode
+        self.fullscreen = False
+        self.color = True
 
     def create_output_screen(self, eyes_bounding_boxes, frame):
         output_screen = np.zeros((self.height, self.width, 3), dtype=np.uint8)
+        if not self.color:
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)  # Convert frame to grayscale
+            frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)  # Keep 3 channels for compatibility
 
         if not eyes_bounding_boxes:
             self._display_no_eyes(output_screen)
@@ -52,32 +56,43 @@ class Display:
 
     def _display_eyes(self, eyes_bounding_boxes, frame, output_screen):
         num_eyes = len(eyes_bounding_boxes)
-        rows, cols = self._determine_grid_layout(num_eyes)
-        split_width = self.width // cols
-        split_height = self.height // rows
+        rows, cols, black_splits = self._determine_grid_layout(num_eyes)
+        split_width, split_height = self._calculate_split_size(rows, cols)
 
-        for i, (x1, y1, x2, y2) in enumerate(eyes_bounding_boxes):
-            eye_img = frame[y1:y2, x1:x2]
-            if eye_img.size == 0:
-                continue  # Skip invalid bounding boxes
-            resized_eye = cv2.resize(eye_img, (split_width, split_height))
+        idx = 0
+        for row in range(rows):
+            for col in range(cols):
+                if idx >= num_eyes or idx >= (rows * cols - black_splits):
+                    break  # Skip extra splits for black padding
+                x1, y1, x2, y2 = eyes_bounding_boxes[idx]
+                eye_img = frame[y1:y2, x1:x2]
+                if eye_img.size == 0:
+                    continue
+                resized_eye = cv2.resize(eye_img, (split_width, split_height))
+                
+                start_x = col * split_width + (self.width - cols * split_width) // 2
+                start_y = row * split_height + (self.height - rows * split_height) // 2
 
-            row_idx = i // cols
-            col_idx = i % cols
-            start_x = col_idx * split_width
-            start_y = row_idx * split_height
-
-            output_screen[start_y:start_y + split_height, start_x:start_x + split_width] = resized_eye
+                output_screen[start_y:start_y + split_height, start_x:start_x + split_width] = resized_eye
+                idx += 1
 
     def _determine_grid_layout(self, num_eyes):
-        if num_eyes == 1:
-            return 1, 1
-        elif num_eyes == 3:
-            return 3, 1
-        else:
-            rows = int(np.ceil(num_eyes / 2))
-            cols = 2
-            return rows, cols
+        grid_map = {
+            **{i: (2, 2, 4 - i) for i in range(1, 5)},
+            **{i: (3, 3, 9 - i) for i in range(5, 10)},
+            **{i: (4, 4, 16 - i) for i in range(10, 17)},
+            **{i: (5, 5, 25 - i) for i in range(17, 26)}
+        }
+        return grid_map.get(num_eyes, (3, 3, 0))
+
+    def _calculate_split_size(self, rows, cols):
+        aspect_ratio = 16 / 9
+        split_height = self.height // rows
+        split_width = int(split_height * aspect_ratio)
+        if split_width * cols > self.width:
+            split_width = self.width // cols
+            split_height = int(split_width / aspect_ratio)
+        return split_width, split_height
 
     def show_output_screen(self, output_screen):
         """Show the processed eye detection output in a separate window and resize it to fit more space on screen."""
@@ -93,10 +108,19 @@ class Display:
             cv2.resizeWindow(window_name, self.width, self.height)
             cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_NORMAL)
 
+    def overlay_performance_data(self, output_screen, perf_data):
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        y_offset = 20
+        for key, value in perf_data.items():
+            cv2.putText(output_screen, f"{key}: {value}", (10, y_offset), font, 0.5, (255, 255, 255), 1)
+            y_offset += 20
+
     def check_exit_condition(self):
         key = cv2.waitKey(1) & 0xFF
         if key == ord('v'):
-            self.fullscreen = not self.fullscreen  # Toggle fullscreen mode
+            self.fullscreen = not self.fullscreen
+        if key == ord('c'):
+            self.color = not self.color
         return key == ord('q')
 
     def destroy_all_windows(self):

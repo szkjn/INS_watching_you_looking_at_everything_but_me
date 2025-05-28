@@ -8,6 +8,7 @@ class Display:
         self.width, self.height = RGB_RESOLUTION
         self.fullscreen = False
         self.color = True
+        self.horizontal_flip = False
 
     def create_output_screen(self, eyes_bounding_boxes, frame):
         output_screen = np.zeros((self.height, self.width, 3), dtype=np.uint8)
@@ -24,15 +25,28 @@ class Display:
 
     def show_output_screen(self, output_screen):
         """Show the processed eye detection output in a separate window and resize it to fit more space on screen."""
+        # Apply horizontal flip if enabled
+        if self.horizontal_flip:
+            output_screen = cv2.flip(output_screen, 1)
+            
         cv2.namedWindow('Eye Detection', cv2.WINDOW_NORMAL)
-        self._apply_window_state('Eye Detection')
+        
+        if self.fullscreen:
+            cv2.setWindowProperty('Eye Detection', cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+        else:
+            cv2.setWindowProperty('Eye Detection', cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_NORMAL)
+            cv2.resizeWindow('Eye Detection', self.width, self.height)
+            
         cv2.imshow('Eye Detection', output_screen)
+
     def check_keyboard_interaction(self, frame):
         key = cv2.waitKey(1) & 0xFF
-        if key == ord('v'):
+        if key == ord('f'):
             self.fullscreen = not self.fullscreen
         if key == ord('c'):
             self.color = not self.color
+        if key == ord('r'):
+            self.horizontal_flip = not self.horizontal_flip
         if key == ord('s'):
             timestamp = time.strftime("%Y%m%d_%H%M%S")
             filename = f"snap_{timestamp}.png"
@@ -76,52 +90,36 @@ class Display:
             cv2.putText(output_screen, line, (text_x, text_y), font, font_scale, text_color, font_thickness)
 
     def _display_eyes(self, eyes_bounding_boxes, frame, output_screen):
-        num_eyes = len(eyes_bounding_boxes)
-        rows, cols, black_splits = self._determine_grid_layout(num_eyes)
-        split_width, split_height = self._calculate_split_size(rows, cols)
+        # Fixed 6x2 grid layout
+        rows, cols = 2, 6
+        split_width = self.width // cols
+        split_height = self.height // rows
 
-        idx = 0
+        # Fill the grid with available eyes, cycling through them if needed
         for row in range(rows):
             for col in range(cols):
-                if idx >= num_eyes or idx >= (rows * cols - black_splits):
-                    break  # Skip extra splits for black padding
-                x1, y1, x2, y2 = eyes_bounding_boxes[idx]
-                eye_img = frame[y1:y2, x1:x2]
-                if eye_img.size == 0:
-                    continue
-                resized_eye = cv2.resize(eye_img, (split_width, split_height))
+                grid_index = row * cols + col
                 
-                start_x = col * split_width + (self.width - cols * split_width) // 2
-                start_y = row * split_height + (self.height - rows * split_height) // 2
-
-                output_screen[start_y:start_y + split_height, start_x:start_x + split_width] = resized_eye
-                idx += 1
+                if eyes_bounding_boxes:
+                    # Cycle through available eyes if we have fewer than 12
+                    eye_index = grid_index % len(eyes_bounding_boxes)
+                    x1, y1, x2, y2 = eyes_bounding_boxes[eye_index]
+                    eye_img = frame[y1:y2, x1:x2]
+                    
+                    if eye_img.size > 0:
+                        # Resize eye image to fit the grid cell
+                        resized_eye = cv2.resize(eye_img, (split_width, split_height))
+                        
+                        # Calculate position in the grid
+                        start_x = col * split_width
+                        start_y = row * split_height
+                        
+                        # Place the eye image in the grid
+                        output_screen[start_y:start_y + split_height, start_x:start_x + split_width] = resized_eye
 
     def _determine_grid_layout(self, num_eyes):
-        grid_map = {
-            **{i: (2, 2, 4 - i) for i in range(1, 5)},
-            **{i: (3, 3, 9 - i) for i in range(5, 10)},
-            **{i: (4, 4, 16 - i) for i in range(10, 17)},
-            **{i: (5, 5, 25 - i) for i in range(17, 26)}
-        }
-        return grid_map.get(num_eyes, (3, 3, 0))
-
-    def _calculate_split_size(self, rows, cols):
-        aspect_ratio = 16 / 9
-        split_height = self.height // rows
-        split_width = int(split_height * aspect_ratio)
-        if split_width * cols > self.width:
-            split_width = self.width // cols
-            split_height = int(split_width / aspect_ratio)
-        return split_width, split_height
-
-    def _apply_window_state(self, window_name):
-        if self.fullscreen:
-            cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-        else:
-            self.width, self.height = RGB_RESOLUTION
-            cv2.resizeWindow(window_name, self.width, self.height)
-            cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_NORMAL)
+        # Always return 6 columns and 2 rows for fixed grid layout
+        return (2, 6, 0)  # (rows, cols, black_splits)
 
 
 class DebugDisplay:

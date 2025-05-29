@@ -1,7 +1,9 @@
 import cv2
 import numpy as np
 import time
-from src.config import RGB_RESOLUTION, MAIN_TEXT_FONT_SCALE, MAIN_TEXT_FONT_WEIGHT, MAIN_TEXT_FONT_TYPE, MAIN_TEXT_VERTICAL_OFFSET, AVAILABLE_FONTS, FONT_NAMES
+from src.config import (RGB_RESOLUTION, MAIN_TEXT_FONT_SCALE, MAIN_TEXT_FONT_WEIGHT, 
+                       MAIN_TEXT_FONT_TYPE, MAIN_TEXT_VERTICAL_OFFSET, AVAILABLE_FONTS, 
+                       FONT_NAMES, GRID_ROWS, GRID_COLS)
 
 class Display:
     def __init__(self): 
@@ -95,8 +97,9 @@ class Display:
             cv2.putText(output_screen, line, (text_x, text_y), font, font_scale, text_color, font_thickness)
 
     def _display_eyes(self, eyes_bounding_boxes, frame, output_screen):
-        # Fixed 6x2 grid layout
-        rows, cols = 2, 6
+        # Use configurable grid layout
+        rows, cols = GRID_ROWS, GRID_COLS
+        total_positions = rows * cols
         split_width = self.width // cols
         split_height = self.height // rows
 
@@ -106,7 +109,7 @@ class Display:
                 grid_index = row * cols + col
                 
                 if eyes_bounding_boxes:
-                    # Cycle through available eyes if we have fewer than 12
+                    # Cycle through available eyes if we have fewer than total positions
                     eye_index = grid_index % len(eyes_bounding_boxes)
                     x1, y1, x2, y2 = eyes_bounding_boxes[eye_index]
                     eye_img = frame[y1:y2, x1:x2]
@@ -123,8 +126,8 @@ class Display:
                         output_screen[start_y:start_y + split_height, start_x:start_x + split_width] = resized_eye
 
     def _determine_grid_layout(self, num_eyes):
-        # Always return 6 columns and 2 rows for fixed grid layout
-        return (2, 6, 0)  # (rows, cols, black_splits)
+        # Return configurable grid layout
+        return (GRID_ROWS, GRID_COLS, 0)  # (rows, cols, black_splits)
 
 
 class DebugDisplay:

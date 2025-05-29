@@ -2,20 +2,26 @@ import blobconverter
 import cv2
 
 
-FPS = 15    # Default is 30; reduce to 15 FPS
+FPS = 15    # Moderate FPS for 1440p stability
 
-# 16:9 aspect ratio resolutions for 6x2 grid layout
-RGB_RESOLUTION = (1920, 1080)  # Full HD 16:9
+# 1440p resolution - good balance between quality and performance  
+RGB_RESOLUTION = (2560, 1440)  # QHD/2K - middle ground between 1080p and 4K
+# RGB_RESOLUTION = (1920, 1080)  # Full HD 16:9 - most stable
+# RGB_RESOLUTION = (3840, 2160)  # 4K UHD - too demanding for device
 # RGB_RESOLUTION = (1280, 720)   # HD 16:9
-# RGB_RESOLUTION = (1440, 1080)
 
 FACE_DETECT_MODEL = blobconverter.from_zoo('face-detection-retail-0004', shaves=6)
 CONFIDENCE_THRESHOLD = 0.5
 
 DEBUG_MODE = True
 
+# Grid layout settings
+GRID_ROWS = 3       # Number of rows in the eye grid
+GRID_COLS = 9       # Number of columns in the eye grid
+# Total eye positions = GRID_ROWS × GRID_COLS (currently 3×9 = 27)
+
 # Main text font settings
-MAIN_TEXT_FONT_SCALE = 1.2
+MAIN_TEXT_FONT_SCALE = 1.5
 MAIN_TEXT_FONT_WEIGHT = 2
 MAIN_TEXT_VERTICAL_OFFSET = 25
 

@@ -15,12 +15,11 @@ class FaceDetector:
 
     def _setup_pipeline(self):
         cam_rgb = self.pipeline.createColorCamera()
-        cam_rgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_1080_P)
-        cam_rgb.setPreviewSize(*RGB_RESOLUTION)
-        cam_rgb.setInterleaved(False)
+        cam_rgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_4_K)
+        cam_rgb.setPreviewSize(2560, 1440)  # 1440p resolution - balanced quality/performance
         cam_rgb.setInterleaved(False)
 
-        # Set FPS lower to stabilize detections
+        # Set FPS for good performance at 1440p
         cam_rgb.setFps(FPS)
 
         manip = self.pipeline.createImageManip()

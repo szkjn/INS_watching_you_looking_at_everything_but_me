@@ -1,9 +1,18 @@
 import cv2
 import numpy as np
 import time
-from src.config import (RGB_RESOLUTION, MAIN_TEXT_FONT_SCALE, MAIN_TEXT_FONT_WEIGHT, 
-                       MAIN_TEXT_FONT_TYPE, MAIN_TEXT_VERTICAL_OFFSET, AVAILABLE_FONTS, 
-                       FONT_NAMES, GRID_ROWS, GRID_COLS)
+import random
+from src.config import (
+    RGB_RESOLUTION, 
+    MAIN_TEXT_FONT_SCALE, 
+    MAIN_TEXT_FONT_WEIGHT, 
+    MAIN_TEXT_VERTICAL_OFFSET, 
+    AVAILABLE_FONTS, 
+    FONT_NAMES, 
+    GRID_ROWS, 
+    GRID_COLS, 
+    DISPLAY_MODE
+)
 
 class Display:
     def __init__(self): 
@@ -12,6 +21,12 @@ class Display:
         self.color = True
         self.vertical_flip = False
         self.current_font_index = 0  # Track current font index
+        self.display_mode = DISPLAY_MODE  # Track current display mode
+        
+        # Eye tracking for PARSE_GRID mode
+        self.tracked_eyes = {}  # {eye_id: {'bbox': (x1,y1,x2,y2), 'grid_pos': (row,col)}}
+        self.next_eye_id = 0
+        self.used_positions = set()  # Track which grid positions are occupied
 
     def create_output_screen(self, eyes_bounding_boxes, frame):
         output_screen = np.zeros((self.height, self.width, 3), dtype=np.uint8)
@@ -54,6 +69,22 @@ class Display:
             # Cycle to next font
             self.current_font_index = (self.current_font_index + 1) % len(AVAILABLE_FONTS)
             print(f"Font changed to: {FONT_NAMES[self.current_font_index]}")
+        if key == ord('w'):
+            # Switch display mode between FULL_GRID and PARSE modes
+            if self.display_mode == "FULL_GRID":
+                self.display_mode = "PARSE_MODE_X3"
+            else:
+                self.display_mode = "FULL_GRID"
+            print(f"Display mode changed to: {self.display_mode}")
+        if key == ord('x'):
+            # Toggle between PARSE modes
+            if self.display_mode == "PARSE_MODE_X3":
+                self.display_mode = "PARSE_MODE_X2"
+            elif self.display_mode == "PARSE_MODE_X2":
+                self.display_mode = "PARSE_MODE_X3"
+            else:
+                self.display_mode = "PARSE_MODE_X2"  # Switch from FULL_GRID to X2
+            print(f"Parse mode changed to: {self.display_mode}")
         if key == ord('s'):
             timestamp = time.strftime("%Y%m%d_%H%M%S")
             filename = f"snap_{timestamp}.png"
@@ -97,9 +128,16 @@ class Display:
             cv2.putText(output_screen, line, (text_x, text_y), font, font_scale, text_color, font_thickness)
 
     def _display_eyes(self, eyes_bounding_boxes, frame, output_screen):
-        # Use configurable grid layout
+        if self.display_mode == "FULL_GRID":
+            self._display_eyes_full_grid(eyes_bounding_boxes, frame, output_screen)
+        elif self.display_mode == "PARSE_MODE_X3":
+            self._display_eyes_parse_grid_x3(eyes_bounding_boxes, frame, output_screen)
+        elif self.display_mode == "PARSE_MODE_X2":
+            self._display_eyes_parse_grid_x2(eyes_bounding_boxes, frame, output_screen)
+
+    def _display_eyes_full_grid(self, eyes_bounding_boxes, frame, output_screen):
+        """Original mode: cycles through detected eyes to fill all grid positions"""
         rows, cols = GRID_ROWS, GRID_COLS
-        total_positions = rows * cols
         split_width = self.width // cols
         split_height = self.height // rows
 
@@ -124,6 +162,154 @@ class Display:
                         
                         # Place the eye image in the grid
                         output_screen[start_y:start_y + split_height, start_x:start_x + split_width] = resized_eye
+
+    def _display_eyes_parse_grid_x3(self, eyes_bounding_boxes, frame, output_screen):
+        """PARSE_MODE_X3: Variable multiplication based on eye count"""
+        return self._display_eyes_parse_grid_common(eyes_bounding_boxes, frame, output_screen, variable_multiplier=True)
+    
+    def _display_eyes_parse_grid_x2(self, eyes_bounding_boxes, frame, output_screen):
+        """PARSE_MODE_X2: All eyes doubled (x2)"""
+        return self._display_eyes_parse_grid_common(eyes_bounding_boxes, frame, output_screen, variable_multiplier=False)
+
+    def _display_eyes_parse_grid_common(self, eyes_bounding_boxes, frame, output_screen, variable_multiplier=True):
+        """Common logic for both parse modes with configurable multiplier"""
+        if not eyes_bounding_boxes:
+            # No eyes detected - clear all tracking
+            self.tracked_eyes.clear()
+            self.used_positions.clear()
+            return
+            
+        rows, cols = GRID_ROWS, GRID_COLS
+        total_positions = rows * cols
+        split_width = self.width // cols
+        split_height = self.height // rows
+        
+        # Track which current detections match existing tracked eyes
+        current_detections = list(eyes_bounding_boxes)
+        matched_eye_ids = set()
+        
+        # Step 1: Match current detections with existing tracked eyes
+        for eye_id, tracked_data in list(self.tracked_eyes.items()):
+            old_bbox = tracked_data['bbox']
+            best_match = None
+            best_overlap = 0
+            
+            for i, new_bbox in enumerate(current_detections):
+                overlap = self._calculate_overlap(old_bbox, new_bbox)
+                if overlap > best_overlap and overlap > 0.3:  # 30% overlap threshold
+                    best_overlap = overlap
+                    best_match = i
+            
+            if best_match is not None:
+                # Update the tracked eye with new bbox
+                self.tracked_eyes[eye_id]['bbox'] = current_detections[best_match]
+                matched_eye_ids.add(eye_id)
+                # Remove matched detection from list
+                current_detections.pop(best_match)
+            else:
+                # Eye disappeared - free all its grid positions (including multiplied instances)
+                for instance_key in list(self.used_positions):
+                    if isinstance(instance_key, tuple) and len(instance_key) == 2:
+                        if instance_key[0] == eye_id:  # This position belongs to the disappeared eye
+                            self.used_positions.discard(instance_key)
+                del self.tracked_eyes[eye_id]
+        
+        # Step 2: Assign new detections to new tracked eyes
+        for new_bbox in current_detections:
+            # Create new tracked eye
+            self.tracked_eyes[self.next_eye_id] = {
+                'bbox': new_bbox,
+                'grid_positions': {}  # Will store positions for each multiplied instance
+            }
+            self.next_eye_id += 1
+        
+        # Step 3: Determine multiplication factor
+        num_eyes = len(self.tracked_eyes)
+        if variable_multiplier:
+            # PARSE_MODE_X3: Variable multiplication
+            if 1 <= num_eyes <= 8:
+                multiplier = 3
+            elif 9 <= num_eyes <= 13:
+                multiplier = 2
+            else:
+                multiplier = 1
+        else:
+            # PARSE_MODE_X2: Fixed doubling
+            multiplier = 2
+        
+        # Step 4: Assign grid positions for each eye instance
+        for eye_id, tracked_data in self.tracked_eyes.items():
+            if 'grid_positions' not in tracked_data:
+                tracked_data['grid_positions'] = {}
+                
+            # Ensure this eye has positions for all its multiplied instances
+            for instance in range(multiplier):
+                if instance not in tracked_data['grid_positions']:
+                    # Find available positions
+                    available_positions = []
+                    for row in range(rows):
+                        for col in range(cols):
+                            pos_key = (eye_id, instance)
+                            grid_pos = (row, col)
+                            # Check if this grid position is free
+                            occupied = False
+                            for other_eye_id, other_data in self.tracked_eyes.items():
+                                if 'grid_positions' in other_data:
+                                    for other_instance, other_pos in other_data['grid_positions'].items():
+                                        if other_pos == grid_pos:
+                                            occupied = True
+                                            break
+                                if occupied:
+                                    break
+                            if not occupied:
+                                available_positions.append(grid_pos)
+                    
+                    if available_positions:
+                        # Randomly assign position to this eye instance
+                        grid_pos = random.choice(available_positions)
+                        tracked_data['grid_positions'][instance] = grid_pos
+        
+        # Step 5: Render all eye instances
+        for eye_id, tracked_data in self.tracked_eyes.items():
+            x1, y1, x2, y2 = tracked_data['bbox']
+            
+            for instance, grid_pos in tracked_data.get('grid_positions', {}).items():
+                row, col = grid_pos
+                
+                eye_img = frame[y1:y2, x1:x2]
+                
+                if eye_img.size > 0:
+                    # Resize eye image to fit the grid cell
+                    resized_eye = cv2.resize(eye_img, (split_width, split_height))
+                    
+                    # Calculate position in the grid
+                    start_x = col * split_width
+                    start_y = row * split_height
+                    
+                    # Place the eye image in the grid
+                    output_screen[start_y:start_y + split_height, start_x:start_x + split_width] = resized_eye
+
+    def _calculate_overlap(self, bbox1, bbox2):
+        """Calculate overlap ratio between two bounding boxes"""
+        x1_1, y1_1, x2_1, y2_1 = bbox1
+        x1_2, y1_2, x2_2, y2_2 = bbox2
+        
+        # Calculate intersection
+        x1_i = max(x1_1, x1_2)
+        y1_i = max(y1_1, y1_2)
+        x2_i = min(x2_1, x2_2)
+        y2_i = min(y2_1, y2_2)
+        
+        if x2_i <= x1_i or y2_i <= y1_i:
+            return 0.0  # No overlap
+        
+        intersection_area = (x2_i - x1_i) * (y2_i - y1_i)
+        bbox1_area = (x2_1 - x1_1) * (y2_1 - y1_1)
+        bbox2_area = (x2_2 - x1_2) * (y2_2 - y1_2)
+        
+        # Return intersection over minimum area
+        min_area = min(bbox1_area, bbox2_area)
+        return intersection_area / min_area if min_area > 0 else 0.0
 
     def _determine_grid_layout(self, num_eyes):
         # Return configurable grid layout

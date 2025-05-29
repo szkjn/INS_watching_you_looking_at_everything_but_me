@@ -21,6 +21,12 @@ GRID_ROWS = 3       # Number of rows in the eye grid
 GRID_COLS = 9       # Number of columns in the eye grid
 # Total eye positions = GRID_ROWS × GRID_COLS (currently 3×9 = 27)
 
+# Display mode settings
+DISPLAY_MODE = "FULL_GRID"    # "FULL_GRID", "PARSE_MODE_X3", or "PARSE_MODE_X2"
+# FULL_GRID: Cycles through detected eyes to fill all grid positions
+# PARSE_MODE_X3: Variable multiplication (1-8 eyes=x3, 9-13 eyes=x2, 14+=x1) spread randomly
+# PARSE_MODE_X2: All detected eyes doubled (x2) and spread randomly
+
 # Eye crop settings
 EYE_CROP_SCALE_X = 1.2    # Horizontal crop scaling (1.0 = normal, >1.0 = wider, <1.0 = tighter)
 EYE_CROP_SCALE_Y = 1.2    # Vertical crop scaling (1.0 = normal, >1.0 = taller, <1.0 = tighter)

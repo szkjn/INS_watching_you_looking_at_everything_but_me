@@ -1,14 +1,15 @@
 import cv2
 import numpy as np
 import time
-from src.config import RGB_RESOLUTION
+from src.config import RGB_RESOLUTION, MAIN_TEXT_FONT_SCALE, MAIN_TEXT_FONT_WEIGHT, MAIN_TEXT_FONT_TYPE, MAIN_TEXT_VERTICAL_OFFSET, AVAILABLE_FONTS, FONT_NAMES
 
 class Display:
     def __init__(self): 
         self.width, self.height = RGB_RESOLUTION
         self.fullscreen = False
         self.color = True
-        self.horizontal_flip = False
+        self.vertical_flip = False
+        self.current_font_index = 0  # Track current font index
 
     def create_output_screen(self, eyes_bounding_boxes, frame):
         output_screen = np.zeros((self.height, self.width, 3), dtype=np.uint8)
@@ -25,9 +26,9 @@ class Display:
 
     def show_output_screen(self, output_screen):
         """Show the processed eye detection output in a separate window and resize it to fit more space on screen."""
-        # Apply horizontal flip if enabled
-        if self.horizontal_flip:
-            output_screen = cv2.flip(output_screen, 1)
+        # Apply vertical flip if enabled
+        if self.vertical_flip:
+            output_screen = cv2.flip(output_screen, 0)
             
         cv2.namedWindow('Eye Detection', cv2.WINDOW_NORMAL)
         
@@ -46,7 +47,11 @@ class Display:
         if key == ord('c'):
             self.color = not self.color
         if key == ord('r'):
-            self.horizontal_flip = not self.horizontal_flip
+            self.vertical_flip = not self.vertical_flip
+        if key == ord('a'):
+            # Cycle to next font
+            self.current_font_index = (self.current_font_index + 1) % len(AVAILABLE_FONTS)
+            print(f"Font changed to: {FONT_NAMES[self.current_font_index]}")
         if key == ord('s'):
             timestamp = time.strftime("%Y%m%d_%H%M%S")
             filename = f"snap_{timestamp}.png"
@@ -69,9 +74,9 @@ class Display:
             "AT EVERYTHING BUT ME",
         ]
         
-        font = cv2.FONT_HERSHEY_DUPLEX
-        font_scale = 2.5
-        font_thickness = 5
+        font = AVAILABLE_FONTS[self.current_font_index]  # Use current font from cycling
+        font_scale = MAIN_TEXT_FONT_SCALE
+        font_thickness = MAIN_TEXT_FONT_WEIGHT
         text_color = (255, 255, 255)
         line_spacing = 20  # Space between lines
         
@@ -79,8 +84,8 @@ class Display:
         text_sizes = [cv2.getTextSize(line, font, font_scale, font_thickness)[0] for line in lines]
         total_text_height = sum(h for w, h in text_sizes) + (len(lines) - 1) * line_spacing
         
-        # Start position for the first line (centered vertically)
-        start_y = (self.height - total_text_height) // 2
+        # Start position for the first line (centered vertically + offset)
+        start_y = (self.height - total_text_height) // 2 + MAIN_TEXT_VERTICAL_OFFSET
 
         for i, line in enumerate(lines):
             text_size = text_sizes[i]
@@ -151,7 +156,7 @@ class DebugDisplay:
 
     def overlay_performance_data(self, frame, perf_data):
         font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = .9
+        font_scale = 0.9  # Debug text font scale (hardcoded since user doesn't care about it)
         font_thickness = 2
         text_color = (0, 0, 255)  # White text
         bg_color = (0, 0, 0)  # Black background

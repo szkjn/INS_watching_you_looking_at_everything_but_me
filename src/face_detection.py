@@ -2,7 +2,7 @@ import depthai as dai
 import cv2
 import numpy as np
 import time
-from src.config import RGB_RESOLUTION, FACE_DETECT_MODEL, CONFIDENCE_THRESHOLD, FPS
+from src.config import RGB_RESOLUTION, FACE_DETECT_MODEL, CONFIDENCE_THRESHOLD, FPS, EYE_CROP_SCALE_X, EYE_CROP_SCALE_Y
 from src.utils import frameNorm
 
 class FaceDetector:
@@ -61,8 +61,27 @@ class FaceDetector:
             eyes = self.eye_cascade.detectMultiScale(gray_face, scaleFactor=1.1, minNeighbors=7, minSize=(15, 15))
 
             for (ex, ey, ew, eh) in eyes:
-                x1, y1, x2, y2 = bbox[0] + ex, bbox[1] + ey, bbox[0] + ex + ew, bbox[1] + ey + eh
-                new_eyes.append((x1, y1, x2, y2))
+                # Apply crop scaling to eye bounding box
+                center_x = ex + ew // 2
+                center_y = ey + eh // 2
+                
+                # Scale the dimensions
+                scaled_width = int(ew * EYE_CROP_SCALE_X)
+                scaled_height = int(eh * EYE_CROP_SCALE_Y)
+                
+                # Calculate new coordinates centered on the original eye
+                new_ex = center_x - scaled_width // 2
+                new_ey = center_y - scaled_height // 2
+                
+                # Convert to global frame coordinates
+                x1 = max(0, bbox[0] + new_ex)
+                y1 = max(0, bbox[1] + new_ey)
+                x2 = min(frame.shape[1], bbox[0] + new_ex + scaled_width)
+                y2 = min(frame.shape[0], bbox[1] + new_ey + scaled_height)
+                
+                # Only add if we have a valid region
+                if x2 > x1 and y2 > y1:
+                    new_eyes.append((x1, y1, x2, y2))
 
         # If no eyes detected, use the last valid detections for 0.5s before switching to "I C U"
         if not new_eyes:

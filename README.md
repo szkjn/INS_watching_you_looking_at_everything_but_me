@@ -1,20 +1,22 @@
 # INS - Watching You Looking at Everything but Me
 
-An interactive eye detection and display system using Intel OAK cameras and DepthAI technology. This project creates an artistic visualization that tracks faces and eyes, displaying them in a grid layout with the message "WATCHING YOU LOOKING AT EVERYTHING BUT ME" when no eyes are detected.
+An interactive eye detection and display system using Luxonis OAK-D cameras and DepthAI technology. This project streams an interactive video feed that tracks faces and eyes, displaying them in a grid layout.
+A video installation by Edda Rabold and Jun Suzuki ([more info here](https://www.linkedin.com/posts/jun-suzuki_depthai-vsa-technopolice-activity-7402257607970766848-Y--z?utm_source=share&utm_medium=member_desktop&rcm=ACoAABKqUGABmdBONs3Be4UTvj4Q9cK4ihZAh5A)).
 
 ## Features
 
 - **Real-time Face & Eye Detection**: Uses DepthAI neural networks for accurate face detection combined with OpenCV Haar cascades for eye detection
-- **Grid Display**: Shows detected eyes in a fixed 6x2 grid layout at 1920x1080 resolution
-- **Interactive Controls**: Toggle fullscreen, color modes, vertical flip, and capture screenshots
-- **Debug Mode**: Optional debug view showing the full camera frame with bounding boxes
-- **Performance Monitoring**: Real-time display of CPU usage, memory consumption, and chip temperature
+- **Grid Display**: Shows detected eyes in a 3x9 grid layout at 2560x1440 resolution
+- **Multiple Display Modes**: 
+  - FULL_GRID: Cycles through detected eyes to fill all grid positions
+  - PARSE_MODE_X3: Variable multiplication based on eye count
+  - PARSE_MODE_X2: All eyes doubled and spread randomly
+- **Interactive Controls**: Toggle fullscreen, color modes, vertical flip, font cycling, display modes, and capture screenshots
 
 ## Hardware Requirements
 
-- Intel OAK camera (OAK-D, OAK-1, etc.)
+- OAK-D camera
 - Computer with USB 3.0+ port
-- Sufficient processing power for real-time neural network inference
 
 ## Installation
 
@@ -35,11 +37,6 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-4. **Important**: Comment out deprecated import in `.venv/lib/site-packages/fer/classes.py`, line 7:
-```python
-# from moviepy.editor import *
-```
-
 ## Usage
 
 Run the main application:
@@ -52,6 +49,9 @@ python main.py
 - **F**: Toggle fullscreen mode
 - **C**: Toggle color/grayscale mode
 - **R**: Toggle vertical flip
+- **A**: Cycle through available fonts
+- **W**: Switch between FULL_GRID and PARSE_MODE_X3
+- **X**: Toggle between PARSE_MODE_X2 and PARSE_MODE_X3
 - **S**: Save screenshot with timestamp
 - **Q**: Quit application
 
@@ -61,7 +61,9 @@ Edit `src/config.py` to modify:
 - FPS settings
 - Resolution (RGB_RESOLUTION)
 - Neural network confidence threshold
-- Debug mode toggle
+- Grid layout (GRID_ROWS, GRID_COLS)
+- Display mode (DISPLAY_MODE)
+- Eye crop scaling (EYE_CROP_SCALE_X, EYE_CROP_SCALE_Y)
 
 ## Project Structure
 
@@ -81,8 +83,8 @@ requirements.txt           # Python dependencies
 
 - **Face Detection**: Uses MobileNet-based neural network (`face-detection-retail-0004`)
 - **Eye Detection**: OpenCV Haar cascades within detected face regions
-- **Display**: Fixed 6x2 grid layout that cycles through available eyes
-- **Performance**: Optimized for real-time processing at 15 FPS
+- **Display**: 3x9 grid layout (27 positions) with multiple display modes
+- **Performance**: Optimized for real-time processing at 15 FPS at 1440p resolution
 
 ## Troubleshooting
 
